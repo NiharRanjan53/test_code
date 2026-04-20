@@ -48,3 +48,61 @@ df = pd.DataFrame(data, columns=["SB Number", "Description"])
 df.to_excel("sb_output.xlsx", index=False)
 
 print(df)
+
+============================
+
+import pdfplumber
+import re
+import pandas as pd
+
+
+def extract_text(pdf_path):
+    text = ""
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            t = page.extract_text()
+            if t:
+                text += t + "\n"
+    return text
+
+
+def extract_sb_desc(text):
+    # Step 1: Locate Cat 7 section
+    pattern = r'Incorporate.*Cat\s*7.*SB[’\'s]*:?(.*?)(?=\n\s*[a-z]\.|$)'
+    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+
+    if not match:
+        return []
+
+    section = match.group(1)
+
+    # Step 2: Normalize text (VERY IMPORTANT)
+    section = re.sub(r'\n+', ' ', section)
+
+    # Step 3: Extract SB + Description
+    matches = re.findall(
+        r'(\d{2}-\d{4})\s*[–-]?\s*(.*?)(?=\d{2}-\d{4}|$)',
+        section
+    )
+
+    results = []
+    for sb, desc in matches:
+        desc = desc.strip(" -–:")
+        desc = re.sub(r'\s+', ' ', desc)  # clean spaces
+        results.append((sb, desc))
+
+    return results
+
+
+# -------- MAIN --------
+pdf_path = "input.pdf"
+
+text = extract_text(pdf_path)
+
+data = extract_sb_desc(text)
+
+df = pd.DataFrame(data, columns=["SB Number", "Description"])
+
+df.to_excel("sb_output.xlsx", index=False)
+
+print(df)
